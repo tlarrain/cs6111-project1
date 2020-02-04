@@ -29,7 +29,8 @@ def get_google_results(json_api_key, search_engine_id, query):
         shortened_item = dict()
         shortened_item['url'] = item['formattedUrl']
         shortened_item['title'] = item['title']
-        shortened_item['description'] = item['snippet'].replace('\n', '')
+        shortened_item['description'] = item['snippet'].replace(
+            '\n', '').replace('\xa0', '')
         res_list.append(shortened_item)
     return res_list
 
@@ -105,7 +106,8 @@ def get_relevance_feedback(results):
         if answer.title() == 'Y':
             relevance = RELEVANT_KEYWORD
 
-        feedback_dictionary[relevance].append(result['description'])
+        feedback_dictionary[relevance].append(result['title']
+                                              + ' ' + result['description'])
 
     print('======================')
     return feedback_dictionary
@@ -117,7 +119,8 @@ def compute_terms_set(custom_search_results):
     '''
     term_set = set()
     for result in custom_search_results:
-        cleaned_result = clean_string(result['description'])
+        cleaned_result = clean_string(result['title']
+                                      + ' ' + result['description'])
         term_set.update(set(cleaned_result.split()))
     return term_set
 
