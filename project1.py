@@ -137,6 +137,8 @@ def main():
 
         raw_query = augmented_query
 
+    print('Below desired precision, but max number of attempts has been reached.')
+
 
 if __name__ == '__main__':
     main()
