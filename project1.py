@@ -1,21 +1,27 @@
 import sys
+import re
+import math
+import requests
 from googleapiclient.discovery import build
 
 
 '''
 Fixed Values
 '''
+RELEVANT_KEYWORD = 'relevant'
+NOT_RELEVANT_KEYWORD = 'not_relevant'
 SEARCH_ENGINE_ID = ''
 JSON_API_KEY = ''
 MAX_ATTEMPTS = 5
+STOP_WORDS = requests.get("http://www.cs.columbia.edu/~gravano/cs6111/proj1-stop.txt").text.split("\n")
 
 
-'''
-Wrapper method for api call to json api to get google results for query
-Input: search engine id, json api key, query
-Output: list of formatted query results
-'''
 def get_google_results(json_api_key, search_engine_id, query):
+    '''
+    Wrapper method for api call to json api to get google results for query
+    Input: search engine id, json api key, query
+    Output: list of formatted query results
+    '''
     res_list = []
     service = build("customsearch", "v1", developerKey=json_api_key)
     res = service.cse().list(q=query, cx=search_engine_id).execute()
@@ -23,25 +29,32 @@ def get_google_results(json_api_key, search_engine_id, query):
         shortened_item = dict()
         shortened_item['url'] = item['formattedUrl']
         shortened_item['title'] = item['title']
-        shortened_item['description'] = item['snippet'].replace('\n','')
+        shortened_item['description'] = item['snippet'].replace('\n', '')
         res_list.append(shortened_item)
     return res_list
 
 
-'''
-Computing precision@10
-'''
+def compute_total_query_count(feedback_dict):
+    '''
+    Getting total query results count
+    '''
+    return (len(feedback_dict[RELEVANT_KEYWORD])
+            + len(feedback_dict[NOT_RELEVANT_KEYWORD]))
+
+
 def compute_precision_10(feedback_dict):
-    values = list(feedback_dict.values())
-    count_yes = values.count('Y') + values.count('y')
-    count_total = len(feedback_dict)
-    return count_yes/count_total
+    '''
+    Computing precision@10
+    '''
+    count_yes = len(feedback_dict[RELEVANT_KEYWORD])
+    return count_yes/compute_total_query_count(feedback_dict)
 
 
-'''
-Showing users their input
-'''
-def print_received_input(json_api_key, search_engine_id, input_query, des_precision):
+def print_received_input(json_api_key, search_engine_id,
+                         input_query, des_precision):
+    '''
+    Showing users their input
+    '''
     print('Parameters:')
     print(f'Client key  = {json_api_key}')
     print(f'Engine key  = {search_engine_id}')
@@ -49,10 +62,10 @@ def print_received_input(json_api_key, search_engine_id, input_query, des_precis
     print(f'Precision  = {des_precision}')
 
 
-'''
-Result summary for users.
-'''
 def print_feedback_summary(input_query, res_precision, des_precision):
+    '''
+    Result summary for users.
+    '''
     print('FEEDBACK SUMMARY')
     print(f'Query {input_query}')
     print(f'Precision {res_precision}')
@@ -66,11 +79,14 @@ def print_feedback_summary(input_query, res_precision, des_precision):
         sys.exit()
 
 
-'''
-Display search results and get relevance feedback from users.
-'''
 def get_relevance_feedback(results):
-    feedback_dictionary = {}
+    '''
+    Display search results and get relevance feedback from users.
+    '''
+    feedback_dictionary = {
+        RELEVANT_KEYWORD: [],
+        NOT_RELEVANT_KEYWORD: [],
+    }
     print('Google Search Results:')
     print('======================')
 
@@ -85,32 +101,101 @@ def get_relevance_feedback(results):
 
         answer = input('Relevant (Y/N)?')
         print('----------------------')
-        feedback_dictionary[result['url']] = answer
+        relevance = NOT_RELEVANT_KEYWORD
+        if answer.title() == 'Y':
+            relevance = RELEVANT_KEYWORD
+
+        feedback_dictionary[relevance].append(result['description'])
 
     print('======================')
     return feedback_dictionary
 
 
-'''
-TO DO: METHOD FOR QUERY EXPANSION LOGIC
-'''
-def get_augmented_query(input_query, search_results, relevance_feedback_dict):
-    print('Indexing results ....')
-    print('Indexing results ....')
+def compute_terms_set(custom_search_results):
+    '''
+    Convert all search results into one set of terms
+    '''
+    term_set = set()
+    for result in custom_search_results:
+        cleaned_result = clean_string(result['description'])
+        term_set.update(set(cleaned_result.split()))
+    return term_set
 
+
+def get_augmented_query(input_query, search_results, relevance_feedback_dict):
+    '''
+    Method for query logic expansion
+    '''
+    print('Indexing results ....')
+    S = len(relevance_feedback_dict[RELEVANT_KEYWORD])
+    N = compute_total_query_count(relevance_feedback_dict)
+    terms_set = compute_terms_set(search_results)
+    terms_params = get_terms_odds_params(terms_set, relevance_feedback_dict)
+    ct_params = compute_ct_params(terms_params, S, N)
+    words_added = 0
     added_string = ''
+    for ct in ct_params:
+        if words_added == 2:
+            break
+        if ct[0] in STOP_WORDS or ct[0] in input_query:
+            continue
+        added_string += ct[0] + ' '
+        words_added += 1
+
     print(f'Augmenting by {added_string}')
-    aug_query = input_query + added_string
+    aug_query = input_query + ' ' + added_string
 
     return aug_query
 
 
-'''
-MAIN METHOD
-'''
+def get_terms_odds_params(terms_set, relevance_feedback_dict):
+    terms_params = {}
+    for term in terms_set:
+        s = 0
+        df_t = 0
+        for relevant_doc in relevance_feedback_dict[RELEVANT_KEYWORD]:
+            clean_doc = clean_string(relevant_doc)
+            if term in clean_doc:
+                s += 1
+                df_t += 1
+        for not_relevant_doc in relevance_feedback_dict[NOT_RELEVANT_KEYWORD]:
+            clean_doc = clean_string(not_relevant_doc)
+            if term in clean_doc:
+                df_t += 1
+        terms_params[term] = (s, df_t)
+    return terms_params
+
+
+def compute_ct_params(terms_params, S, N):
+    '''
+    Get c_t params for each term
+    '''
+    ct_params = {}
+    for term in terms_params:
+        s, df_t = terms_params[term]
+        ct_params[term] = math.log(
+            ((s + 0.5) / (S - s + 0.5))
+            / ((df_t - s + 0.5) / (N - df_t - S + s + 0.5)))
+
+    return sorted(ct_params.items(), key=lambda x: x[1], reverse=True)
+
+
+def clean_string(string):
+    '''
+    Clean string from unwanted elements
+    '''
+    alphabet_pattern = re.compile(r'[^a-zA-Z ]+')
+    cleaned_string = re.sub(alphabet_pattern, '', string).lower()
+    return cleaned_string
+
+
 def main():
+    '''
+    Main method
+    '''
     if not (len(sys.argv) == 5 and sys.argv[3].replace('.', '', 1).isdigit()):
-        sys.exit("Format: basic.py <Google API Key> <Google Search Engine ID> <Precision> <Query>")
+        sys.exit("Format: basic.py <Google API Key> "
+                 + "<Google Search Engine ID> <Precision> <Query>")
 
     JSON_API_KEY, SEARCH_ENGINE_ID = sys.argv[1], sys.argv[2]
     desired_precision, raw_query = float(sys.argv[3]), sys.argv[4]
@@ -137,7 +222,8 @@ def main():
 
         raw_query = augmented_query
 
-    print('Below desired precision, but max number of attempts has been reached.')
+    print('Below desired precision, '
+          + 'but max number of attempts has been reached.')
 
 
 if __name__ == '__main__':
