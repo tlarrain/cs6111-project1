@@ -13,7 +13,11 @@ NOT_RELEVANT_KEYWORD = 'not_relevant'
 SEARCH_ENGINE_ID = ''
 JSON_API_KEY = ''
 MAX_ATTEMPTS = 5
-STOP_WORDS = requests.get("http://www.cs.columbia.edu/~gravano/cs6111/proj1-stop.txt").text.split("\n")
+STOP_WORDS = get_stop_words()
+
+
+def get_stop_words():
+    return requests.get("http://www.cs.columbia.edu/~gravano/cs6111/proj1-stop.txt").text.split("\n")
 
 
 def get_google_results(json_api_key, search_engine_id, query):
