@@ -32,9 +32,15 @@ def get_google_results(json_api_key, search_engine_id, query):
     for item in res['items']:
         shortened_item = dict()
         shortened_item['url'] = item['formattedUrl']
-        shortened_item['title'] = item['title']
-        shortened_item['description'] = item['snippet'].replace(
-            '\n', '').replace('\xa0', '')
+        if 'snippet' not in item:
+            shortened_item['description'] = ''
+        else:
+            shortened_item['description'] = item['snippet'].replace(
+                '\n', '').replace('\xa0', '')
+        if 'title' not in item:
+            shortened_item['title'] = ''
+        else:
+            shortened_item['title'] = item['title']
         res_list.append(shortened_item)
     return res_list
 
@@ -110,8 +116,8 @@ def get_relevance_feedback(results):
         if answer.title() == 'Y':
             relevance = RELEVANT_KEYWORD
 
-        feedback_dictionary[relevance].append(result['title']
-                                              + ' ' + result['description'])
+        feedback_dictionary[relevance].append(result['title'])
+        feedback_dictionary[relevance].append(result['description'])
 
     print('======================')
     return feedback_dictionary
@@ -192,6 +198,7 @@ def clean_string(string):
     Clean string from unwanted elements
     '''
     alphabet_pattern = re.compile(r'[^a-zA-Z ]+')
+    cleaned_string = string.replace('-', ' ')
     cleaned_string = re.sub(alphabet_pattern, '', string).lower()
     return cleaned_string
 
