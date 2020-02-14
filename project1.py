@@ -25,7 +25,7 @@ STOP_WORDS = get_stop_words()
 
 
 def get_google_results(json_api_key,
-                       search_engine_id, query, mock_response=True):
+                       search_engine_id, query, mock_response=False):
     '''
     Wrapper method for api call to json api to get google results for query
     Input: search engine id, json api key, query
