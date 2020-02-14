@@ -3,10 +3,14 @@ import re
 import math
 import requests
 from googleapiclient.discovery import build
+from mock_response import MOCK_RESPONSE
+from HttpResponse import FormattedResponse
 
 
 def get_stop_words():
-    return requests.get("http://www.cs.columbia.edu/~gravano/cs6111/proj1-stop.txt").text.split("\n")
+    return requests.get(
+        "http://www.cs.columbia.edu/"
+        + "~gravano/cs6111/proj1-stop.txt").text.split("\n")
 
 
 '''
@@ -20,27 +24,21 @@ MAX_ATTEMPTS = 5
 STOP_WORDS = get_stop_words()
 
 
-def get_google_results(json_api_key, search_engine_id, query):
+def get_google_results(json_api_key,
+                       search_engine_id, query, mock_response=True):
     '''
     Wrapper method for api call to json api to get google results for query
     Input: search engine id, json api key, query
     Output: list of formatted query results
     '''
     res_list = []
-    service = build("customsearch", "v1", developerKey=json_api_key)
-    res = service.cse().list(q=query, cx=search_engine_id).execute()
-    for item in res['items']:
-        shortened_item = dict()
-        shortened_item['url'] = item['formattedUrl']
-        if 'snippet' not in item:
-            shortened_item['description'] = ''
-        else:
-            shortened_item['description'] = item['snippet'].replace(
-                '\n', '').replace('\xa0', '')
-        if 'title' not in item:
-            shortened_item['title'] = ''
-        else:
-            shortened_item['title'] = item['title']
+    if mock_response:
+        res = {'items': MOCK_RESPONSE}
+    else:
+        service = build("customsearch", "v1", developerKey=json_api_key)
+        res = service.cse().list(q=query, cx=search_engine_id).execute()
+    for i, item in enumerate(res['items']):
+        shortened_item = FormattedResponse(item, i)
         res_list.append(shortened_item)
     return res_list
 
@@ -104,9 +102,9 @@ def get_relevance_feedback(results):
     for i, result in enumerate(results):
         print(f'Result {i+1}')
         print('[')
-        print(f'URL: {result["url"]}')
-        print(f'Title: {result["title"]}')
-        print(f'Description: {result["description"]}')
+        print(f'URL: {result.url}')
+        print(f'Title: {result.title}')
+        print(f'Description: {result.description}')
         print(']')
         print()
 
@@ -116,8 +114,7 @@ def get_relevance_feedback(results):
         if answer.title() == 'Y':
             relevance = RELEVANT_KEYWORD
 
-        feedback_dictionary[relevance].append(result['title'])
-        feedback_dictionary[relevance].append(result['description'])
+        feedback_dictionary[relevance].append(result)
 
     print('======================')
     return feedback_dictionary
@@ -129,8 +126,7 @@ def compute_terms_set(custom_search_results):
     '''
     term_set = set()
     for result in custom_search_results:
-        cleaned_result = clean_string(result['title']
-                                      + ' ' + result['description'])
+        cleaned_result = clean_string(result.joint_text)
         term_set.update(set(cleaned_result.split()))
     return term_set
 
@@ -166,16 +162,18 @@ def get_terms_odds_params(terms_set, relevance_feedback_dict):
     for term in terms_set:
         s = 0
         df_t = 0
+        doc_rank = 0
         for relevant_doc in relevance_feedback_dict[RELEVANT_KEYWORD]:
-            clean_doc = clean_string(relevant_doc)
+            clean_doc = clean_string(relevant_doc.joint_text)
             if term in clean_doc:
                 s += 1
                 df_t += 1
+                doc_rank = max(1, relevant_doc.result_rank)
         for not_relevant_doc in relevance_feedback_dict[NOT_RELEVANT_KEYWORD]:
-            clean_doc = clean_string(not_relevant_doc)
+            clean_doc = clean_string(not_relevant_doc.joint_text)
             if term in clean_doc:
                 df_t += 1
-        terms_params[term] = (s, df_t)
+        terms_params[term] = (s, df_t, doc_rank)
     return terms_params
 
 
@@ -185,12 +183,15 @@ def compute_ct_params(terms_params, S, N):
     '''
     ct_params = {}
     for term in terms_params:
-        s, df_t = terms_params[term]
-        ct_params[term] = math.log(
+        s, df_t, rank = terms_params[term]
+        ct_params[term] = (math.log(
             ((s + 0.5) / (S - s + 0.5))
-            / ((df_t - s + 0.5) / (N - df_t - S + s + 0.5)))
+            / ((df_t - s + 0.5) / (N - df_t - S + s + 0.5))), rank)
 
-    return sorted(ct_params.items(), key=lambda x: x[1], reverse=True)
+    ct_list = list(ct_params.items())
+    ct_list.sort(key=lambda x:x[1][1])
+    ct_list.sort(key=lambda x:x[1][0], reverse=True)
+    return ct_list
 
 
 def clean_string(string):
@@ -215,24 +216,19 @@ def main():
     desired_precision, raw_query = float(sys.argv[3]), sys.argv[4]
 
     for i in range(MAX_ATTEMPTS):
-        print_received_input(JSON_API_KEY,
-                             SEARCH_ENGINE_ID,
-                             raw_query,
-                             desired_precision)
+        print_received_input(
+            JSON_API_KEY, SEARCH_ENGINE_ID, raw_query, desired_precision)
 
-        custom_search_results = get_google_results(JSON_API_KEY,
-                                                   SEARCH_ENGINE_ID,
-                                                   raw_query)
+        custom_search_results = get_google_results(
+            JSON_API_KEY, SEARCH_ENGINE_ID, raw_query)
 
         relevance_feedback = get_relevance_feedback(custom_search_results)
         result_precision = compute_precision_10(relevance_feedback)
 
-        print_feedback_summary(raw_query,
-                               result_precision,
-                               desired_precision)
-        augmented_query = get_augmented_query(raw_query,
-                                              custom_search_results,
-                                              relevance_feedback)
+        print_feedback_summary(
+            raw_query, result_precision, desired_precision)
+        augmented_query = get_augmented_query(
+            raw_query, custom_search_results, relevance_feedback)
 
         raw_query = augmented_query
 
