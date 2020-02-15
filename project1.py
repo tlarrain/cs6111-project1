@@ -22,10 +22,12 @@ SEARCH_ENGINE_ID = ''
 JSON_API_KEY = ''
 MAX_ATTEMPTS = 5
 STOP_WORDS = get_stop_words()
+USE_FULL_TEXT = False
+USE_MOCK = False
 
 
 def get_google_results(json_api_key,
-                       search_engine_id, query, mock_response=True):
+                       search_engine_id, query, mock_response=USE_MOCK):
     '''
     Wrapper method for api call to json api to get google results for query
     Input: search engine id, json api key, query
@@ -38,7 +40,7 @@ def get_google_results(json_api_key,
         service = build("customsearch", "v1", developerKey=json_api_key)
         res = service.cse().list(q=query, cx=search_engine_id).execute()
     for i, item in enumerate(res['items']):
-        shortened_item = FormattedResponse(item, i)
+        shortened_item = FormattedResponse(item, i, full_text=USE_FULL_TEXT)
         res_list.append(shortened_item)
     return res_list
 
@@ -126,8 +128,8 @@ def compute_terms_set(custom_search_results):
     '''
     term_set = set()
     for result in custom_search_results:
-        cleaned_result = clean_string(result.joint_text)
-        term_set.update(set(cleaned_result.split()))
+        result_terms = result.tokenized_text
+        term_set.update(set(result_terms))
     return term_set
 
 
@@ -136,8 +138,8 @@ def get_augmented_query(input_query, search_results, relevance_feedback_dict):
     Method for query logic expansion
     '''
     print('Indexing results ....')
-    S = 2*len(relevance_feedback_dict[RELEVANT_KEYWORD])
-    N = 2*compute_total_query_count(relevance_feedback_dict)
+    S = len(relevance_feedback_dict[RELEVANT_KEYWORD])
+    N = compute_total_query_count(relevance_feedback_dict)
     terms_set = compute_terms_set(search_results)
     terms_params = get_terms_odds_params(terms_set, relevance_feedback_dict)
     ct_params = compute_ct_params(terms_params, S, N)
@@ -164,23 +166,13 @@ def get_terms_odds_params(terms_set, relevance_feedback_dict):
         df_t = 0
         doc_rank = 0
         for relevant_doc in relevance_feedback_dict[RELEVANT_KEYWORD]:
-            clean_doc = clean_string(relevant_doc.title)
-            if term in clean_doc:
-                s += 1
-                df_t += 1
-                doc_rank = max(1, relevant_doc.result_rank)
-        for relevant_doc in relevance_feedback_dict[RELEVANT_KEYWORD]:
-            clean_doc = clean_string(relevant_doc.description)
+            clean_doc = relevant_doc.tokenized_text
             if term in clean_doc:
                 s += 1
                 df_t += 1
                 doc_rank = max(1, relevant_doc.result_rank)
         for not_relevant_doc in relevance_feedback_dict[NOT_RELEVANT_KEYWORD]:
-            clean_doc = clean_string(not_relevant_doc.title)
-            if term in clean_doc:
-                df_t += 1
-        for not_relevant_doc in relevance_feedback_dict[NOT_RELEVANT_KEYWORD]:
-            clean_doc = clean_string(not_relevant_doc.description)
+            clean_doc = not_relevant_doc.tokenized_text
             if term in clean_doc:
                 df_t += 1
         terms_params[term] = (s, df_t, doc_rank)
@@ -202,16 +194,6 @@ def compute_ct_params(terms_params, S, N):
     ct_list.sort(key=lambda x:x[1][1])
     ct_list.sort(key=lambda x:x[1][0], reverse=True)
     return ct_list
-
-
-def clean_string(string):
-    '''
-    Clean string from unwanted elements
-    '''
-    alphabet_pattern = re.compile(r'[^a-zA-Z ]+')
-    cleaned_string = string.replace('-', ' ')
-    cleaned_string = re.sub(alphabet_pattern, '', string).lower()
-    return cleaned_string
 
 
 def main():
