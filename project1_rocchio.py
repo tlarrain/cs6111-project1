@@ -152,12 +152,8 @@ def compute_rocchio_query_vector(input_query, search_results,
     tfidf_matrix = tfidf_vectorizer.fit_transform(document_set)
     q_0_vector = tfidf_vectorizer.transform([input_query])
 
-    relevant_doc_vectors = [
-        tfidf_vectorizer.transform([relevant_doc]) for (
-            relevant_doc in relevance_feedback_dict[RELEVANT_KEYWORD])]
-    not_relevant_doc_vectors = [
-        tfidf_vectorizer.transform([not_relevant_doc]) for (
-            not_relevant_doc in relevance_feedback_dict[NOT_RELEVANT_KEYWORD])]
+    relevant_doc_vectors, not_relevant_doc_vectors = get_doc_vectors(
+        relevance_feedback_dict)
 
     relevant_doc_sum = sum(relevant_doc_vectors)
     not_relevant_doc_sum = sum(not_relevant_doc_vectors)
@@ -170,6 +166,18 @@ def compute_rocchio_query_vector(input_query, search_results,
     q_m_vector -= GAMMA * (1 / len_not_relevant_doc) * not_relevant_doc_sum
 
     return q_m_vector
+
+
+def get_doc_vectors(relevance_feedback_dict):
+    relevant_doc_vectors = generate_doc_vectors(
+        relevance_feedback_dict[RELEVANT_KEYWORD])
+    not_relevant_doc_vectors = generate_doc_vectors(
+        relevance_feedback_dict[NOT_RELEVANT_KEYWORD])
+    return relevant_doc_vectors, not_relevant_doc_vectors
+
+
+def generate_doc_vectors(doc_list):
+    return [tfidf_vectorizer.transform([doc]) for (doc in doc_list)]
 
 
 def get_best_words(query_idf, tfidf_vectorizer):
