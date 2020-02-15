@@ -5,7 +5,7 @@ MOCK_RESPONSE = [
             'snippet': 'Download FRIENDS by Marshmello & Anne-Marie HERE http://au.gt/friends PLAY MARSHMELLO MUSIC ...',
         },
         {
-            'formattedUrl': 'https://es.wikipedia.org/wiki/Friends',
+            'formattedUrl': 'https://en.wikipedia.org/wiki/Friends',
             'title': 'Friends - Wikipedia',
             'snippet': 'Friends is an American sitcom television series, created by David Crane and Marta Kauffman, which aired on NBC from September 22, 1994, to May 6, 2004, lasting ten seasons.',
         },

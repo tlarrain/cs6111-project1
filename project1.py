@@ -25,7 +25,7 @@ STOP_WORDS = get_stop_words()
 
 
 def get_google_results(json_api_key,
-                       search_engine_id, query, mock_response=False):
+                       search_engine_id, query, mock_response=True):
     '''
     Wrapper method for api call to json api to get google results for query
     Input: search engine id, json api key, query
@@ -136,8 +136,8 @@ def get_augmented_query(input_query, search_results, relevance_feedback_dict):
     Method for query logic expansion
     '''
     print('Indexing results ....')
-    S = len(relevance_feedback_dict[RELEVANT_KEYWORD])
-    N = compute_total_query_count(relevance_feedback_dict)
+    S = 2*len(relevance_feedback_dict[RELEVANT_KEYWORD])
+    N = 2*compute_total_query_count(relevance_feedback_dict)
     terms_set = compute_terms_set(search_results)
     terms_params = get_terms_odds_params(terms_set, relevance_feedback_dict)
     ct_params = compute_ct_params(terms_params, S, N)
@@ -164,13 +164,23 @@ def get_terms_odds_params(terms_set, relevance_feedback_dict):
         df_t = 0
         doc_rank = 0
         for relevant_doc in relevance_feedback_dict[RELEVANT_KEYWORD]:
-            clean_doc = clean_string(relevant_doc.joint_text)
+            clean_doc = clean_string(relevant_doc.title)
+            if term in clean_doc:
+                s += 1
+                df_t += 1
+                doc_rank = max(1, relevant_doc.result_rank)
+        for relevant_doc in relevance_feedback_dict[RELEVANT_KEYWORD]:
+            clean_doc = clean_string(relevant_doc.description)
             if term in clean_doc:
                 s += 1
                 df_t += 1
                 doc_rank = max(1, relevant_doc.result_rank)
         for not_relevant_doc in relevance_feedback_dict[NOT_RELEVANT_KEYWORD]:
-            clean_doc = clean_string(not_relevant_doc.joint_text)
+            clean_doc = clean_string(not_relevant_doc.title)
+            if term in clean_doc:
+                df_t += 1
+        for not_relevant_doc in relevance_feedback_dict[NOT_RELEVANT_KEYWORD]:
+            clean_doc = clean_string(not_relevant_doc.description)
             if term in clean_doc:
                 df_t += 1
         terms_params[term] = (s, df_t, doc_rank)
