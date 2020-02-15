@@ -191,8 +191,8 @@ def compute_ct_params(terms_params, S, N):
             / ((df_t - s + 0.5) / (N - df_t - S + s + 0.5))), rank)
 
     ct_list = list(ct_params.items())
-    ct_list.sort(key=lambda x:x[1][1])
-    ct_list.sort(key=lambda x:x[1][0], reverse=True)
+    ct_list.sort(key=lambda x: x[1][1])
+    ct_list.sort(key=lambda x: x[1][0], reverse=True)
     return ct_list
 
 
