@@ -138,8 +138,15 @@ def get_augmented_query(input_query, search_results, relevance_feedback_dict):
     q_m_vector = compute_rocchio_query_vector(input_query, search_results,
                                               relevance_feedback_dict, tf)
     new_query_terms = get_best_words(q_m_vector, tf)
+    augmented_words = []
+    for term in new_query_terms:
+        if len(augmented_words) == 2:
+            break
+        if term in input_query:
+            continue
+        augmented_words.append(term)
 
-    return input_query + ' ' + ' '.join(new_query_terms[1:3])
+    return input_query + ' ' + ' '.join(augmented_words)
 
 
 def compute_rocchio_query_vector(input_query, search_results,
@@ -153,7 +160,7 @@ def compute_rocchio_query_vector(input_query, search_results,
     q_0_vector = tfidf_vectorizer.transform([input_query])
 
     relevant_doc_vectors, not_relevant_doc_vectors = get_doc_vectors(
-        relevance_feedback_dict)
+        relevance_feedback_dict, tfidf_vectorizer)
 
     relevant_doc_sum = sum(relevant_doc_vectors)
     not_relevant_doc_sum = sum(not_relevant_doc_vectors)
@@ -168,16 +175,16 @@ def compute_rocchio_query_vector(input_query, search_results,
     return q_m_vector
 
 
-def get_doc_vectors(relevance_feedback_dict):
+def get_doc_vectors(relevance_feedback_dict, tfidf_vectorizer):
     relevant_doc_vectors = generate_doc_vectors(
-        relevance_feedback_dict[RELEVANT_KEYWORD])
+        relevance_feedback_dict[RELEVANT_KEYWORD], tfidf_vectorizer)
     not_relevant_doc_vectors = generate_doc_vectors(
-        relevance_feedback_dict[NOT_RELEVANT_KEYWORD])
+        relevance_feedback_dict[NOT_RELEVANT_KEYWORD], tfidf_vectorizer)
     return relevant_doc_vectors, not_relevant_doc_vectors
 
 
-def generate_doc_vectors(doc_list):
-    return [tfidf_vectorizer.transform([doc]) for (doc in doc_list)]
+def generate_doc_vectors(doc_list, tfidf_vectorizer):
+    return [tfidf_vectorizer.transform([doc]) for doc in doc_list]
 
 
 def get_best_words(query_idf, tfidf_vectorizer):
