@@ -2,15 +2,11 @@ import sys
 import re
 import math
 import requests
+import numpy as np
+from collections import defaultdict
 from googleapiclient.discovery import build
-from mock_response import MOCK_RESPONSE
+from sklearn.feature_extraction.text import TfidfVectorizer
 from HttpResponse import FormattedResponse
-
-
-def get_stop_words():
-    return requests.get(
-        "http://www.cs.columbia.edu/"
-        + "~gravano/cs6111/proj1-stop.txt").text.split("\n")
 
 
 '''
@@ -20,10 +16,13 @@ RELEVANT_KEYWORD = 'relevant'
 NOT_RELEVANT_KEYWORD = 'not_relevant'
 SEARCH_ENGINE_ID = ''
 JSON_API_KEY = ''
-MAX_ATTEMPTS = 5
-STOP_WORDS = get_stop_words()
+MAX_ATTEMPTS = 10
 USE_FULL_TEXT = False
 USE_MOCK = False
+
+ALPHA = 1
+BETA = 0.75
+GAMMA = 0.15
 
 
 def get_google_results(json_api_key,
@@ -116,84 +115,91 @@ def get_relevance_feedback(results):
         if answer.title() == 'Y':
             relevance = RELEVANT_KEYWORD
 
-        feedback_dictionary[relevance].append(result)
+        feedback_dictionary[relevance].append(result.joint_text)
 
     print('======================')
     return feedback_dictionary
-
-
-def compute_terms_set(custom_search_results):
-    '''
-    Convert all search results into one set of terms
-    '''
-    term_set = set()
-    for result in custom_search_results:
-        result_terms = result.tokenized_text
-        term_set.update(set(result_terms))
-    return term_set
 
 
 def get_augmented_query(input_query, search_results, relevance_feedback_dict):
     '''
     Method for query logic expansion
     '''
+
     print('Indexing results ....')
-    S = len(relevance_feedback_dict[RELEVANT_KEYWORD])
-    N = compute_total_query_count(relevance_feedback_dict)
-    terms_set = compute_terms_set(search_results)
-    terms_params = get_terms_odds_params(terms_set, relevance_feedback_dict)
-    ct_params = compute_ct_params(terms_params, S, N)
-    words_added = 0
-    added_string = ''
-    for ct in ct_params:
-        if words_added == 2:
+    tf = TfidfVectorizer(analyzer='word', stop_words='english')
+    q_m_vector = compute_rocchio_query_vector(input_query, search_results,
+                                              relevance_feedback_dict, tf)
+    new_query_terms = get_best_words(q_m_vector, tf)
+    augmented_words = []
+    for term in new_query_terms:
+        if len(augmented_words) == 2:
             break
-        if ct[0] in STOP_WORDS or ct[0] in input_query:
+        if term in input_query:
             continue
-        added_string += ct[0] + ' '
-        words_added += 1
+        augmented_words.append(term)
 
-    print(f'Augmenting by {added_string}')
-    aug_query = input_query + ' ' + added_string
-
-    return aug_query
+    return input_query + ' ' + ' '.join(augmented_words)
 
 
-def get_terms_odds_params(terms_set, relevance_feedback_dict):
-    terms_params = {}
-    for term in terms_set:
-        s = 0
-        df_t = 0
-        doc_rank = 0
-        for relevant_doc in relevance_feedback_dict[RELEVANT_KEYWORD]:
-            clean_doc = relevant_doc.tokenized_text
-            if term in clean_doc:
-                s += 1
-                df_t += 1
-                doc_rank = max(1, relevant_doc.result_rank)
-        for not_relevant_doc in relevance_feedback_dict[NOT_RELEVANT_KEYWORD]:
-            clean_doc = not_relevant_doc.tokenized_text
-            if term in clean_doc:
-                df_t += 1
-        terms_params[term] = (s, df_t, doc_rank)
-    return terms_params
+def compute_rocchio_query_vector(input_query, search_results,
+                                 relevance_feedback_dict, tfidf_vectorizer):
+
+    document_set = []
+    for res in search_results:
+        document_set.append(res.joint_text)
+
+    tfidf_matrix = tfidf_vectorizer.fit_transform(document_set)
+    q_0_vector = tfidf_vectorizer.transform([input_query])
+
+    relevant_doc_vectors, not_relevant_doc_vectors = get_doc_vectors(
+        relevance_feedback_dict, tfidf_vectorizer)
+
+    relevant_doc_sum = sum(relevant_doc_vectors)
+    not_relevant_doc_sum = sum(not_relevant_doc_vectors)
+
+    len_relevant_doc = len(relevance_feedback_dict[RELEVANT_KEYWORD])
+    len_not_relevant_doc = len(relevance_feedback_dict[NOT_RELEVANT_KEYWORD])
+
+    q_m_vector = ALPHA * q_0_vector
+    q_m_vector += BETA * (1 / len_relevant_doc) * relevant_doc_sum
+    q_m_vector -= GAMMA * (1 / len_not_relevant_doc) * not_relevant_doc_sum
+
+    return q_m_vector
 
 
-def compute_ct_params(terms_params, S, N):
-    '''
-    Get c_t params for each term
-    '''
-    ct_params = {}
-    for term in terms_params:
-        s, df_t, rank = terms_params[term]
-        ct_params[term] = (math.log(
-            ((s + 0.5) / (S - s + 0.5))
-            / ((df_t - s + 0.5) / (N - df_t - S + s + 0.5))), rank)
+def get_doc_vectors(relevance_feedback_dict, tfidf_vectorizer):
+    relevant_doc_vectors = generate_doc_vectors(
+        relevance_feedback_dict[RELEVANT_KEYWORD], tfidf_vectorizer)
+    not_relevant_doc_vectors = generate_doc_vectors(
+        relevance_feedback_dict[NOT_RELEVANT_KEYWORD], tfidf_vectorizer)
+    return relevant_doc_vectors, not_relevant_doc_vectors
 
-    ct_list = list(ct_params.items())
-    ct_list.sort(key=lambda x: x[1][1])
-    ct_list.sort(key=lambda x: x[1][0], reverse=True)
-    return ct_list
+
+def generate_doc_vectors(doc_list, tfidf_vectorizer):
+    return [tfidf_vectorizer.transform([doc]) for doc in doc_list]
+
+
+def get_best_words(query_idf, tfidf_vectorizer):
+    rows, cols = query_idf.nonzero()
+    indices = []
+    for i in range(len(rows)):
+        indices.append((rows[i], cols[i]))
+    tfidf_dict = {}
+    for index in indices:
+        tfidf_dict[index] = query_idf[index]
+
+    inv = tfidf_vectorizer.inverse_transform(query_idf)
+    term_list = []
+    for tlist in inv:
+        for term in tlist:
+            term_list.append(term)
+
+    word_scores = dict(zip(term_list, list(tfidf_dict.values())))
+    best_words = sorted(
+        word_scores, key=lambda k: word_scores[k], reverse=True)
+
+    return best_words
 
 
 def main():
@@ -208,19 +214,24 @@ def main():
     desired_precision, raw_query = float(sys.argv[3]), sys.argv[4]
 
     for i in range(MAX_ATTEMPTS):
-        print_received_input(
-            JSON_API_KEY, SEARCH_ENGINE_ID, raw_query, desired_precision)
+        print_received_input(JSON_API_KEY,
+                             SEARCH_ENGINE_ID,
+                             raw_query,
+                             desired_precision)
 
-        custom_search_results = get_google_results(
-            JSON_API_KEY, SEARCH_ENGINE_ID, raw_query)
+        custom_search_results = get_google_results(JSON_API_KEY,
+                                                   SEARCH_ENGINE_ID,
+                                                   raw_query)
 
         relevance_feedback = get_relevance_feedback(custom_search_results)
         result_precision = compute_precision_10(relevance_feedback)
 
-        print_feedback_summary(
-            raw_query, result_precision, desired_precision)
-        augmented_query = get_augmented_query(
-            raw_query, custom_search_results, relevance_feedback)
+        print_feedback_summary(raw_query,
+                               result_precision,
+                               desired_precision)
+        augmented_query = get_augmented_query(raw_query,
+                                              custom_search_results,
+                                              relevance_feedback)
 
         raw_query = augmented_query
 

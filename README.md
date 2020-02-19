@@ -37,7 +37,13 @@ The program will first get arguments such as _API key_, _search engine ID_, _pre
 
 ## Query-modification Method
 
-TO DO
+The query-modification method is based on the ``get_augmented_query()`` method of the code. It first calls sciki-learn's TfidfVectorizer [1] using the parameters ``analyzer='word', stop_words='english'`` to use words as the building blocks, and to remove english stop words from the vectors. Using this class, we transform our relevant and non-relevant documents corpus to a tf-idf vector, and we do the same with our current query.
+
+Having all these 11 vectors (10 for each query result and the query itself), we proceed to implement Rocchio's algorithm. By fixing parameters ``ALPHA = 1``, ``BETA = 0.75`` and ``GAMMA = 0.15``, we compute our augmented query vector using Rocchio's equation (9.3) in [2].
+
+With the augmented query, we go to ``get_best_words()`` to look for the words with the highest tf-idf index. The two highest words (that aren't already in the query), are the ones used to augment the query, and call the procedure again.
 
 ## External references
-[1] API design for machine learning software: experiences from the scikit-learn project, Buitinck et al., 2013.
+[1] Pedregosa, F., Varoquaux, G., Gramfort, A., Michel, V., Thirion, B., Grisel, O., ... & Vanderplas, J. (2011). Scikit-learn: Machine learning in Python. Journal of machine learning research, 12(Oct), 2825-2830.
+
+[2] Manning, C. D., Raghavan, P., & Schütze, H. (2008). Introduction to information retrieval. Cambridge university press.
