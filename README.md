@@ -9,6 +9,7 @@ project1.py | main program
 HttpResponse.py | Google response class
 mock_response.py | Mock Response for offline work
 requirements.txt | Python packages to run the project
+query_transcripts.pdf | Transcript of required queries
 
 ## Credentials
 Credential | Detail
