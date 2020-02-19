@@ -5,17 +5,17 @@ Arjun Mangla (am4409) and Tomás Larrain (tal2150)
 
 Name | Usage
 --- | ---
-project1.py | main program
-HttpResponse.py | Google response class
-mock_response.py | Mock Response for offline work
-requirements.txt | Python packages to run the project
-query_transcripts.pdf | Transcript of required queries
+``project1.py`` | main program
+``HttpResponse.py`` | Google response class
+``mock_response.py`` | Mock Response for offline work
+``requirements.txt`` | Python packages to run the project
+``query_transcripts.pdf`` | Transcript of required queries
 
 ## Credentials
 Credential | Detail
 --- | ---
-AIzaSyC7QIDsftl4f8lLTNwGsevas5hOOC96FZ8 | Google API KEY
-015789145925826530430:flftxrkxktl | Search Engine ID
+``AIzaSyC7QIDsftl4f8lLTNwGsevas5hOOC96FZ8`` | Google API KEY
+``015789145925826530430:flftxrkxktl`` | Search Engine ID
 
 ## Dependencies
 To install, run:
