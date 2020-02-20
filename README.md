@@ -20,15 +20,19 @@ Credential | Detail
 ## Dependencies
 To install, run:
 
-  `$ pip install -r requirements.txt`
+  ```bash
+  $ cd cs6111-project1
+  $ pip install -r requirements.txt
+  ```
 
 ## How to Run
-Under the program's root directory, run
+Under the project's root directory, run
 
-`
-$ python3 project1.py <google api key> <search engine id> <precision> "<query>"
-`
+```bash
+$ python3 project1.py <google api key> <search engine id> <precision> <query>
+```
 
+Note: if `<query>` has multiple words, be sure to put them between quotes (e.g. `"per se"`).
 ## Internal Design
 
 The program will first get arguments such as _API key_, _search engine ID_, _precision@10_, and _query terms_ from user input. The code is mainly divided in 3 main parts (with many methods each):
