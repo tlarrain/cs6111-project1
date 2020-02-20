@@ -1,9 +1,4 @@
 import sys
-import re
-import math
-import requests
-import numpy as np
-from collections import defaultdict
 from googleapiclient.discovery import build
 from sklearn.feature_extraction.text import TfidfVectorizer
 from HttpResponse import FormattedResponse

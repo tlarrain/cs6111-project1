@@ -10,6 +10,7 @@ Name | Usage
 ``mock_response.py`` | Mock Response for offline work
 ``requirements.txt`` | Python packages to run the project
 ``query_transcripts.pdf`` | Transcript of required queries
+``query_tests.xlsx`` | Test queries and their performance compared to reference implementation
 
 ## Credentials
 Credential | Detail
