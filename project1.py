@@ -96,10 +96,13 @@ def print_feedback_summary(input_query, res_precision, des_precision):
 def get_relevance_feedback(results):
     '''
     Display search results and get relevance feedback from users.
-    Input: list of dictionaries of each of the results, user input for each of the displayed results
+    Input: list of dictionaries of each of the results, user input
+           for each of the displayed results
     Output: Dictionary containing 2 lists:
-            1st list: containing 1 string each for all documents declared relevant by user
-            2nd list: containing 1 string each for all documents declared irrelevant by user
+            1st list: containing 1 string each for all documents declared
+                      relevant by user
+            2nd list: containing 1 string each for all documents declared
+                      irrelevant by user
     '''
     feedback_dictionary = {
         RELEVANT_KEYWORD: [],
@@ -119,9 +122,12 @@ def get_relevance_feedback(results):
 
         answer = input('Relevant (Y/N)?')
         print('----------------------')
-        relevance = NOT_RELEVANT_KEYWORD # defaulting to not relevant
-        if answer.title() == 'Y': #interpreting both upper case and lowercase responses
-            relevance = RELEVANT_KEYWORD #changing to relevant only if indicated by user
+        relevance = NOT_RELEVANT_KEYWORD  # defaulting to not relevant
+
+        # interpreting both upper case and lowercase responses
+        if answer.title() == 'Y':
+            # changing to relevant only if indicated by user
+            relevance = RELEVANT_KEYWORD
 
         feedback_dictionary[relevance].append(result.joint_text)
 
@@ -132,30 +138,31 @@ def get_relevance_feedback(results):
 def get_augmented_query(input_query, search_results, relevance_feedback_dict):
     '''
     Method for query logic expansion
-    Input: Query, formatted search results (list of dictionaries), Dictionary with relevance feedback
+    Input: Query, formatted search results (list of dictionaries),
+           Dictionary with relevance feedback
     Output: New, augmented query
     '''
 
     print('Indexing results ....')
 
     # Create TfidfVectorizer instance here to pass through 2 functions:
-    #   rocchio method and highest relevance word retriever
+    # rocchio method and highest relevance word retriever
     tf = TfidfVectorizer(analyzer='word', stop_words='english')
 
     # Compute tf-idf vector for new query
     q_m_vector = compute_rocchio_query_vector(input_query, search_results,
                                               relevance_feedback_dict, tf)
 
-    #From new query vector, get words sorted: highest to lowest tf-idf scores
+    # From new query vector, get words sorted: highest to lowest tf-idf scores
     new_query_terms = get_best_words(q_m_vector, tf)
 
-    #Append words to query
+    # Append words to query
     augmented_words = []
     for term in new_query_terms:
-        #Stop if 2 words selected
+        # Stop if 2 words selected
         if len(augmented_words) == 2:
             break
-        #If the term is already in the query, ignore
+        # If the term is already in the query, ignore
         if term in input_query:
             continue
         augmented_words.append(term)
@@ -166,11 +173,11 @@ def get_augmented_query(input_query, search_results, relevance_feedback_dict):
 def compute_rocchio_query_vector(input_query, search_results,
                                  relevance_feedback_dict, tfidf_vectorizer):
     '''
-        Implements Rocchio to compute new query vector based on relevance feedback
-        Uses tf-idf vector to vectorize documents and queries
-        Input: Query, formatted search results (list of dictionaries),
-                Dictionary with relevance feedback, vectorizer object
-        Output: Resultant query vector
+    Implements Rocchio to compute new query vector based on relevance feedback
+    Uses tf-idf vector to vectorize documents and queries
+    Input: Query, formatted search results (list of dictionaries),
+           Dictionary with relevance feedback, vectorizer object
+    Output: Resultant query vector
     '''
 
     # Creates list of documents to create tf-idf matrix
@@ -181,10 +188,11 @@ def compute_rocchio_query_vector(input_query, search_results,
     # Uses list of documents to create matrix
     tfidf_matrix = tfidf_vectorizer.fit_transform(document_set)
 
-    #Uses matrix to convert input query into tf-idf vector
+    # Uses matrix to convert input query into tf-idf vector
     q_0_vector = tfidf_vectorizer.transform([input_query])
 
-    #Uses matrix to convert relevant, not-relevant documents into individual tf-idf vectors
+    # Uses matrix to convert relevant, not-relevant documents
+    # into individual tf-idf vectors
     relevant_doc_vectors, not_relevant_doc_vectors = get_doc_vectors(
         relevance_feedback_dict, tfidf_vectorizer)
 
@@ -194,7 +202,7 @@ def compute_rocchio_query_vector(input_query, search_results,
     len_relevant_doc = len(relevance_feedback_dict[RELEVANT_KEYWORD])
     len_not_relevant_doc = len(relevance_feedback_dict[NOT_RELEVANT_KEYWORD])
 
-    #Creating new query vector based on Rocchio's formula
+    # Creating new query vector based on Rocchio's formula
     q_m_vector = ALPHA * q_0_vector
     q_m_vector += BETA * (1 / len_relevant_doc) * relevant_doc_sum
     q_m_vector -= GAMMA * (1 / len_not_relevant_doc) * not_relevant_doc_sum
@@ -204,11 +212,13 @@ def compute_rocchio_query_vector(input_query, search_results,
 
 def get_doc_vectors(relevance_feedback_dict, tfidf_vectorizer):
     '''
-        Uses matrix to convert relevant, not-relevant documents into individual tf-idf vectors
-        Input: Dictionary with relevance feedback, vectorizer instance
-        Output: 2 lists of if-idf vectors for relevant and not relevant documents respectively
-    '''
+    Uses matrix to convert relevant, not-relevant documents
+    into individual tf-idf vectors
 
+    Input: Dictionary with relevance feedback, vectorizer instance
+    Output: 2 lists of if-idf vectors for relevant and not relevant
+            documents respectively
+    '''
 
     relevant_doc_vectors = generate_doc_vectors(
         relevance_feedback_dict[RELEVANT_KEYWORD], tfidf_vectorizer)
@@ -224,9 +234,9 @@ def generate_doc_vectors(doc_list, tfidf_vectorizer):
 
 def get_best_words(query_idf, tfidf_vectorizer):
     '''
-        Uses matrix to convert tf-idf vector of query into list of words
-        Input: tf-idf query vector, vectorizer instance
-        Output: list of words, reverse sorted based on scores
+    Uses matrix to convert tf-idf vector of query into list of words
+    Input: tf-idf query vector, vectorizer instance
+    Output: list of words, reverse sorted based on scores
     '''
 
     # Creating dictionary (index in matrix): score
