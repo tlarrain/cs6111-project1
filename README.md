@@ -37,9 +37,9 @@ Note: if `<query>` has multiple words, be sure to put them between quotes (e.g. 
 ## Internal Design
 
 The program will first get arguments such as _API key_, _search engine ID_, _precision@10_, and _query terms_ from user input. The code is mainly divided in 3 main parts (with many methods each):
-1. **Fetch Google Results**: This is mainly done by the ``get_google_results()`` method. After that, they are handled to the user through the terminal for the next step.
-2. **Get relevance feedback**: The user must divide the results between relevant and not relevant through the terminal (summarized in ``get_relevance_feedback()``). With the relevance feedback, ``compute_precision_10()`` checks if the desired precision was achieved.
-3. **Compute augmented query**: With the results of the relevance ready, the system procedes to compute the augmented query in ``get_augmented_query()``. This method returns the full augmented query, which replace the original one to start a new fetch and feedback loop.
+1. **Fetch Google Results**: This is mainly done by the ``get_google_results()`` method that is called once per iteration. This method takes in the query and the credentials (API key, search engine id), and makes a call to the Custom Search Engine API. From the results, the title, description and url of each of the results are stored as dictionary objects. The method then returns a list of these dictionaries.
+2. **Get relevance feedback**: The user must divide the results between relevant and not relevant through the terminal (summarized in ``get_relevance_feedback()``). Just like the reference implementation, the user is presented, one by one, with the results that were extracted using the above method. For each result, the user provides feedback as to whether it is relevant or not. With the relevance feedback, ``compute_precision_10()`` checks if the desired precision was achieved. If the precision has been reached, the program terminates after presenting this outcome to the user. If not, the program continues to the next step. 
+3. **Compute augmented query**: With the results of the relevance ready, the system procedes to compute the augmented query in ``get_augmented_query()``. This method returns the full augmented query, which replaces the original one to start a new fetch and feedback loop. This loop happens a maximum number of times dictated by the MAX_ATTEMPTS variable, currently set to 10.
 
 ## Query-modification Method
 
