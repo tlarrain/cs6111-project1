@@ -1,7 +1,6 @@
 from requests_html import HTMLSession
 from html2text import HTML2Text
 import re
-from nltk.tokenize import word_tokenize
 
 HTML_SESSION = HTMLSession()
 HTML_2_TEXT = HTML2Text()
@@ -25,9 +24,6 @@ class FormattedResponse():
         self.body = ''
         if full_text:
             self.body = self.get_body_from_url()
-
-        self.tokenized_text = word_tokenize(
-            self.__clean_string(self.joint_text))
 
     @property
     def joint_text(self):
